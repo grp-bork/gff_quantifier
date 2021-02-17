@@ -6,6 +6,30 @@ from intervaltree import IntervalTree
 
 
 class GffDatabaseManager:
+	def _get_features(self, header, line):
+		#print("GF", header, line, sep="\n")
+		features = list()
+		for feat_cat, subfeatures in zip(header[6:], line[6:]):
+			subfeatures = tuple(sf for sf in subfeatures.strip().split(",") if sf)
+			if subfeatures:
+				features.append((feat_cat, subfeatures))
+		return line[0], (("strand", None),) + tuple(features)
+
+	def iterate_chunks(self, bufsize=4e6):
+		header = None
+		with self.db as db_stream:
+			tail = ""
+			while True:
+				chunk = "".join((tail, db_stream.read(int(bufsize))))
+				if not chunk:
+					break
+				chunk = chunk.split("\n")
+				chunk, tail = chunk[:-1], chunk[-1]
+				for line in chunk:
+					if line.startswith("#"):
+						header = line.strip("#").split("\t")
+					else:
+						yield self._get_features(header, line.split("\t"))
 
 	def iterate(self):
 		header = None
@@ -15,13 +39,14 @@ class GffDatabaseManager:
 				if line.startswith("#"):
 					header = line.strip("#").split("\t")
 				else:
-					line = line.split("\t")
-					features = list()
-					for feat_cat, subfeatures in zip(header[6:], line[6:]):
-						subfeatures = tuple(sf for sf in subfeatures.strip().split(",") if sf)
-						if subfeatures:
-							features.append((feat_cat, subfeatures))
-					yield line[0], (("strand", None),) + tuple(features)
+					yield self._get_features(header, line.split("\t"))
+					#line = line.split("\t")
+					#features = list()
+					#for feat_cat, subfeatures in zip(header[6:], line[6:]):
+					#	subfeatures = tuple(sf for sf in subfeatures.strip().split(",") if sf)
+					#	if subfeatures:
+					#		features.append((feat_cat, subfeatures))
+					#yield line[0], (("strand", None),) + tuple(features)
 
 	def _read_index(self, f):
 		db_index = dict()
