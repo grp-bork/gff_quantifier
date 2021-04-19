@@ -4,7 +4,7 @@ from functools import lru_cache
 
 from intervaltree import IntervalTree
 
-from .rewindable import RewindableIterator
+from .rewindable import RewindableFileIterator
 
 
 class GffDatabaseManager:
@@ -33,12 +33,17 @@ class GffDatabaseManager:
         return db_index
 
     def __init__(self, db, db_index=None):
+        gz_magic = "\x1f\x8b\x08"
         if db_index:
+            if gzipped:
+                raise ValueError(f"Database {db} is gzipped. This doesn't work together with an index. Please unzip and re-index.")
             self.db_index = self._read_index(db_index)
             self.db = open(db, "rt")
         else:
+            _open = gzip.open if gzipped else open
             self.db_index = None
-            self.db = gzip.open(db, "rt")
+            self.db = RewindableFileIterator(_open(db, "rt"))
+
 
     @lru_cache(maxsize=4096)
     def _read_data(self, ref_id, include_payload=False):
