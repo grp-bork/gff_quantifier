@@ -67,7 +67,7 @@ def main():
         raise ValueError("annotation database does not exist", args.annotation_db)
 
     db_index = None
-    if args.mode == "genome":
+    if args.mode in ("genome", "domain"):
         db_index = args.annotation_db + ".index"
         if not os.path.exists(db_index):
             raise ValueError("gff index '{}' does not exist (please generate index with 'gffindex {}')".format(db_index, args.annotation_db))

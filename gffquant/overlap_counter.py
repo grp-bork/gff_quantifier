@@ -51,6 +51,8 @@ class OverlapCounter(dict):
         if aln:
             overlaps = self.db.get_overlaps(*aln)
             if overlaps:
+                for ovl in overlaps:
+                    print(rid, ovl.begin, ovl.end, rev_strand, file=sys.stderr, flush=True)
                 self.setdefault(rid, Counter()).update((ovl.begin, ovl.end, rev_strand) for ovl in overlaps)
             else:
                 self.unannotated_reads += 1
