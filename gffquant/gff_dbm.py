@@ -34,6 +34,7 @@ class GffDatabaseManager:
 
     def __init__(self, db, db_index=None):
         gz_magic = "\x1f\x8b\x08"
+        gzipped = open(db).read(3).startswith(gz_magic)
         if db_index:
             if gzipped:
                 raise ValueError(f"Database {db} is gzipped. This doesn't work together with an index. Please unzip and re-index.")
@@ -44,20 +45,30 @@ class GffDatabaseManager:
             self.db_index = None
             self.db = RewindableFileIterator(_open(db, "rt"))
 
+    @staticmethod
+    def get_gff_attribs(attribs):
+        return tuple((item.split("=")[0], tuple(sorted(item.split("=")[1].split(",")))) for item in attribs.strip().split(";"))
 
     @lru_cache(maxsize=4096)
     def _read_data(self, ref_id, include_payload=False):
         gff_annotation = dict()
         for offset, size in self.db_index.get(ref_id, list()):
+            print("INDEX:", offset, size, ref_id)
             self.db.seek(offset)
             for line in self.db.read(size).strip("\n").split("\n"):
+                print("DB:", ref_id, line, file=sys.stderr, flush=True)
                 if not line.startswith("#"):
                     line = line.strip().split("\t")
                     features = dict()
                     if include_payload:
-                        features = (("strand", line[6]),)
-                        features += tuple((item.split("=")[0], tuple(sorted(item.split("=")[1].split(",")))) for item in line[8].strip().split(";"))
-                    key = (line[0], int(line[3]), int(line[4]) + 1)
+                        if len(line) == 9:
+                            features = (("strand", line[6]), ) + self.get_gff_attribs(line[8])
+                        else:
+                            features = (("strand", None), ("ID", ref_id), ("feature", (line[3],)))
+                    if len(line) == 9:
+                        key = (line[0], int(line[3]), int(line[4]) + 1)
+                    else:
+                        key = (line[0], int(line[1]), int(line[2]))
                     gff_annotation[key] = features
         if not gff_annotation and not include_payload:
             print("WARNING: contig {contig} does not have an annotation in the index.".format(contig=ref_id), file=sys.stderr, flush=True)
