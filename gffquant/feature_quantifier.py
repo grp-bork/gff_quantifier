@@ -24,10 +24,11 @@ class FeatureQuantifier:
 		self.gff_dbm = GffDatabaseManager(db, db_index=db_index) if db and db_index else None
 		self.umap_cache = dict()
 		self.ambig_cache = dict()
-		self.overlap_counter = OverlapCounter(out_prefix, self.gff_dbm, do_overlap_detection=do_overlap_detection, strand_specific=strand_specific)
+		self.overlap_counter = None
 		self.out_prefix = out_prefix
 		self.ambig_mode = ambig_mode
 		self.do_overlap_detection = do_overlap_detection
+		self.strand_specific = strand_specific
 		self.bamfile = None
 		print("Ambig mode:", self.ambig_mode, flush=True)
 
@@ -223,6 +224,8 @@ class FeatureQuantifier:
 	def process_bamfile(self, bamfile):
 		""" processes one position-sorted bamfile """
 		self.bamfile = BamFile(bamfile, large_header=not self.do_overlap_detection) # this is ugly!
+		self.overlap_counter = OverlapCounter(self.out_prefix, self.gff_dbm, do_overlap_detection=self.do_overlap_detection, strand_specific=self.strand_specific)
+
 		# first pass: process uniqs and dump ambigs (if required)
 		aln_count, unannotated_ambig, ambig_dumpfile = self.process_alignments()
 		self.gff_dbm.clear_caches()
@@ -272,6 +275,7 @@ class FeatureQuantifier:
 				self.overlap_counter.update_ambiguous_counts(hits, n_aln, feat_distmode=self.ambig_mode)
 
 	def process_bedfile(self, bedfile):
+		self.overlap_counter = OverlapCounter(self.out_prefix, self.gff_dbm, do_overlap_detection=self.do_overlap_detection, strand_specific=self.strand_specific)
 		current_group = list()
 		feature_lengths = dict()
 		for ovl in csv.reader(open(bedfile), delimiter="\t"):
